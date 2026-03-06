@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Blaster: Mobile Platformer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #gameCanvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #0ff;
+            font-size: 14px;
+            text-shadow: 0 0 10px #0ff;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            height: 150px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .control-zone {
+            position: absolute;
+            pointer-events: auto;
+        }
+        
+        #leftBtn, #rightBtn {
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid rgba(0, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0ff;
+            font-size: 30px;
+            bottom: 20px;
+        }
+        
+        #leftBtn { left: 20px; }
+        #rightBtn { left: 110px; }
+        
+        #actionBtns {
+            right: 20px;
+            bottom: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .action-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            border: 2px solid;
+            pointer-events: auto;
+        }
+        
+        #jumpBtn {
+            background: rgba(255, 215, 0, 0.2);
+            border-color: rgba(255, 215, 0, 0.5);
+            color: #ffd700;
+        }
+        
+        #shootBtn {
+            background: rgba(255, 0, 100, 0.2);
+            border-color: rgba(255, 0, 100, 0.5);
+            color: #ff0064;
+        }
+        
+        #dodgeBtn {
+            background: rgba(0, 255, 150, 0.2);
+            border-color: rgba(0, 255, 150, 0.5);
+            color: #00ff96;
+            width: 60px;
+            height: 60px;
+        }
+        
+        .btn-active {
+            transform: scale(0.95);
+            filter: brightness(1.5);
+        }
+        
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+        
+        h1 {
+            color: #0ff;
+            font-size: 36px;
+            text-shadow: 0 0 20px #0ff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .btn {
+            padding: 15px 40px;
+            background: linear-gradient(45deg, #ff0064, #ff6b00);
+            border: none;
+            color: white;
+            font-size: 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            margin: 10px;
+            box-shadow: 0 0 20px rgba(255, 0, 100, 0.5);
+            transition: transform 0.2s;
+        }
+        
+        .btn:active {
+            transform: scale(0.95);
+        }
+        
+        .hidden { display: none !important; }
+        
+        #healthBar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 200px;
+            height: 20px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid #ff0000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #healthFill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6600);
+            transition: width 0.3s;
+            box-shadow: 0 0 10px #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div>SCORE: <span id="score">0</span></div>
+        <div>LEVEL: <span id="level">1</span></div>
+    </div>
+    
+    <div id="healthBar">
+        <div id="healthFill" style="width: 100%"></div>
+    </div>
+    
+    <div id="controls">
+        <div id="leftBtn" class="control-zone">←</div>
+        <div id="rightBtn" class="control-zone">→</div>
+        <div id="actionBtns" class="control-zone">
+            <div id="dodgeBtn" class="action-btn">D</div>
+            <div id="jumpBtn" class="action-btn">↑</div>
+            <div id="shootBtn" class="action-btn">●</div>
+        </div>
+    </div>
+    
+    <div id="startScreen">
+        <h1>⚡ NEON BLASTER ⚡</h1>
+        <p style="color: #0ff; margin-bottom: 30px; text-align: center; padding: 0 20px;">
+            Jump • Shoot • Dodge • Explore<br>
+            Collect coins • Defeat enemies • Survive
+        </p>
+        <button class="btn" onclick="startGame()">START MISSION</button>
+    </div>
+    
+    <div id="gameOverScreen" class="hidden">
+        <h1 id="endTitle">GAME OVER</h1>
+        <p style="color: #fff; font-size: 24px; margin-bottom: 20px;">Score: <span id="finalScore">0</span></p>
+        <button class="btn" onclick="restartGame()">TRY AGAIN</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas size
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let level = 1;
+        let camera = { x: 0, y: 0 };
+        let particles = [];
+        let bullets = [];
+        let enemies = [];
+        let coins = [];
+        let platforms = [];
+        let floatingTexts = [];
+        
+        // Player
+        const player = {
+            x: 100,
+            y: 300,
+            width: 30,
+            height: 40,
+            vx: 0,
+            vy: 0,
+            speed: 5,
+            jumpPower: 12,
+            health: 100,
+            maxHealth: 100,
+            facing: 1,
+            grounded: false,
+            dodging: false,
+            dodgeTimer: 0,
+            shootCooldown: 0,
+            invincible: 0,
+            color: '#0ff'
+        };
+        
+        // Input
+        const keys = {};
+        let touchInput = { left: false, right: false, jump: false, shoot: false, dodge: false };
+        
+        // Touch controls
+        function setupControls() {
+            const leftBtn = document.getElementById('leftBtn');
+            const rightBtn = document.getElementById('rightBtn');
+            const jumpBtn = document.getElementById('jumpBtn');
+            const shootBtn = document.getElementById('shootBtn');
+            const dodgeBtn = document.getElementById('dodgeBtn');
+            
+            const addTouch = (elem, key) => {
+                elem.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    touchInput[key] = true;
+                    elem.classList.add('btn-active');
+                });
+                elem.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    touchInput[key] = false;
+                    elem.classList.remove('btn-active');
+                });
+            };
+            
+            addTouch(leftBtn, 'left');
+            addTouch(rightBtn, 'right');
+            addTouch(jumpBtn, 'jump');
+            addTouch(shootBtn, 'shoot');
+            addTouch(dodgeBtn, 'dodge');
+        }
+        setupControls();
+        
+        // Keyboard fallback
+        window.addEventListener('keydown', (e) => keys[e.key] = true);
+        window.addEventListener('keyup', (e) => keys[e.key] = false);
+        
+        // Particle system
+        class Particle {
+            constructor(x, y, color, speed, life) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * speed;
+                this.vy = (Math.random() - 0.5) * speed;
+                this.color = color;
+                this.life = life;
+                this.maxLife = life;
+                this.size = Math.random() * 4 + 2;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.2;
+                this.life--;
+                this.size *= 0.98;
+            }
+            draw() {
+                ctx.globalAlpha = this.life / this.maxLife;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - camera.x, this.y - camera.y, this.size, this.size);
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        // Bullet
+        class Bullet {
+            constructor(x, y, vx, vy, isPlayer) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.isPlayer = isPlayer;
+                this.life = 100;
+                this.size = isPlayer ? 6 : 4;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+                
+                // Trail
+                if (Math.random() > 0.5) {
+                    particles.push(new Particle(this.x, this.y, this.isPlayer ? '#0ff' : '#f00', 2, 10));
+                }
+            }
+            draw() {
+                ctx.fillStyle = this.isPlayer ? '#0ff' : '#f00';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.fillRect(this.x - camera.x - this.size/2, this.y - camera.y - this.size/2, this.size, this.size);
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Enemy
+        class Enemy {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.width = 35;
+                this.height = 35;
+                this.type = type; // 0: walker, 1: shooter, 2: flyer
+                this.vx = type === 2 ? 0 : (Math.random() > 0.5 ? 1 : -1) * (1 + Math.random());
+                this.vy = 0;
+                this.health = type === 1 ? 2 : 1;
+                this.shootTimer = 0;
+                this.patrolStart = x;
+                this.patrolDist = 100 + Math.random() * 100;
+            }
+            update() {
+                if (this.type === 0) {
+                    // Walker
+                    this.x += this.vx;
+                    if (Math.abs(this.x - this.patrolStart) > this.patrolDist) {
+                        this.vx *= -1;
+                    }
+                } else if (this.type === 1) {
+                    // Shooter - stays put and shoots
+                    this.shootTimer++;
+                    if (this.shootTimer > 120 && Math.abs(player.x - this.x) < 400) {
+                        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                        bullets.push(new Bullet(
+                            this.x, this.y + 10,
+                            Math.cos(angle) * 4,
+                            Math.sin(angle) * 4,
+                            false
+                        ));
+                        this.shootTimer = 0;
+                    }
+                } else if (this.type === 2) {
+                    // Flyer
+                    this.y += Math.sin(Date.now() / 500) * 2;
+                    if (Math.abs(player.x - this.x) < 300) {
+                        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                        this.x += Math.cos(angle) * 1.5;
+                        this.y += Math.sin(angle) * 1.5;
+                    }
+                }
+                
+                // Gravity for walkers
+                if (this.type !== 2) {
+                    this.vy += 0.5;
+                    this.y += this.vy;
+                    
+                    // Platform collision
+                    platforms.forEach(plat => {
+                        if (this.x > plat.x && this.x < plat.x + plat.width &&
+                            this.y + this.height/2 > plat.y && this.y + this.height/2 < plat.y + plat.height + 10) {
+                            this.y = plat.y - this.height/2;
+                            this.vy = 0;
+                        }
+                    });
+                }
+            }
+            draw() {
+                const screenX = this.x - camera.x;
+                const screenY = this.y - camera.y;
+                
+                ctx.save();
+                ctx.translate(screenX, screenY);
+                
+                if (this.type === 0) {
+                    // Walker - spike ball
+                    ctx.fillStyle = '#ff6600';
+                    ctx.beginPath();
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2 + Date.now() / 200;
+                        const r = i % 2 === 0 ? 20 : 10;
+                        ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                } else if (this.type === 1) {
+                    // Shooter - turret
+                    ctx.fillStyle = '#ff0066';
+                    ctx.fillRect(-15, -15, 30, 30);
+                    ctx.fillStyle = '#ffaa00';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Barrel
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    ctx.rotate(angle);
+                    ctx.fillRect(0, -3, 20, 6);
+                } else {
+                    // Flyer - drone
+                    ctx.fillStyle = '#aa00ff';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.fillRect(-20, -3, 40, 6);
+                }
+                
+                ctx.restore();
+            }
+        }
+        
+        // Coin
+        class Coin {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 12;
+                this.collected = false;
+                this.bob = Math.random() * Math.PI * 2;
+            }
+            update() {
+                this.bob += 0.05;
+            }
+            draw() {
+                if (this.collected) return;
+                const y = this.y + Math.sin(this.bob) * 5;
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(this.x - camera.x, y - camera.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Generate level
+        function generateLevel() {
+            platforms = [];
+            enemies = [];
+            coins = [];
+            bullets = [];
+            
+            // Ground platforms
+            for (let i = 0; i < 50; i++) {
+                const y = canvas.height - 100 - Math.random() * 200;
+                platforms.push({
+                    x: i * 200 + Math.random() * 100,
+                    y: y,
+                    width: 150 + Math.random() * 100,
+                    height: 20
+                });
+                
+                // Add enemies
+                if (i > 2 && Math.random() > 0.6) {
+                    const type = Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : 2) : 0;
+                    enemies.push(new Enemy(
+                        platforms[platforms.length-1].x + platforms[platforms.length-1].width/2,
+                        platforms[platforms.length-1].y - 30,
+                        type
+                    ));
+                }
+                
+                // Add coins
+                if (Math.random() > 0.4) {
+                    coins.push(new Coin(
+                        platforms[platforms.length-1].x + platforms[platforms.length-1].width/2,
+                        platforms[platforms.length-1].y - 50 - Math.random() * 50
+                    ));
+                }
+            }
+            
+            // Floating platforms
+            for (let i = 0; i < 30; i++) {
+                platforms.push({
+                    x: 300 + i * 300 + Math.random() * 200,
+                    y: 200 + Math.random() * 300,
+                    width: 80 + Math.random() * 60,
+                    height: 15
+                });
+            }
+        }
+        
+        // Update player
+        function updatePlayer() {
+            // Movement
+            const movingLeft = keys['ArrowLeft'] || keys['a'] || touchInput.left;
+            const movingRight = keys['ArrowRight'] || keys['d'] || touchInput.right;
+            const jumping = keys['ArrowUp'] || keys['w'] || keys[' '] || touchInput.jump;
+            const shooting = keys['f'] || touchInput.shoot;
+            const dodging = keys['Shift'] || touchInput.dodge;
+            
+            // Dodge
+            if (dodging && !player.dodging && player.dodgeTimer <= 0) {
+                player.dodging = true;
+                player.dodgeTimer = 30;
+                player.invincible = 20;
+                player.vx = player.facing * 12;
+            }
+            
+            if (player.dodging) {
+                player.dodgeTimer--;
+                player.vx *= 0.9;
+                if (player.dodgeTimer <= 20) {
+                    player.dodging = false;
+                }
+            } else {
+                // Normal movement
+                if (movingLeft) {
+                    player.vx = -player.speed;
+                    player.facing = -1;
+                } else if (movingRight) {
+                    player.vx = player.speed;
+                    player.facing = 1;
+                } else {
+                    player.vx *= 0.8;
+                }
+            }
+            
+            // Jump
+            if (jumping && player.grounded && !player.dodging) {
+                player.vy = -player.jumpPower;
+                player.grounded = false;
+                // Jump particles
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(player.x, player.y + 20, '#0ff', 5, 20));
+                }
+            }
+            
+            // Shoot
+            if (shooting && player.shootCooldown <= 0 && !player.dodging) {
+                bullets.push(new Bullet(
+                    player.x + player.facing * 20,
+                    player.y,
+                    player.facing * 10,
+                    0,
+                    true
+                ));
+                player.shootCooldown = 15;
+                
+                // Recoil
+                player.vx -= player.facing * 2;
+            }
+            if (player.shootCooldown > 0) player.shootCooldown--;
+            
+            // Physics
+            player.vy += 0.6;
+            player.x += player.vx;
+            player.y += player.vy;
+            
+            // Invincibility
+            if (player.invincible > 0) player.invincible--;
+            
+            // Platform collision
+            player.grounded = false;
+            platforms.forEach(plat => {
+                if (player.x + player.width/2 > plat.x && 
+                    player.x - player.width/2 < plat.x + plat.width &&
+                    player.y + player.height/2 > plat.y && 
+                    player.y + player.height/2 < plat.y + plat.height + player.vy + 5 &&
+                    player.vy >= 0) {
+                    player.y = plat.y - player.height/2;
+                    player.vy = 0;
+                    player.grounded = true;
+                }
+            });
+            
+            // Fall death
+            if (player.y > canvas.height + 200) {
+                player.health = 0;
+            }
+            
+            // Camera follow
+            camera.x += (player.x - canvas.width/2 - camera.x) * 0.1;
+            camera.y += (player.y - canvas.height/2 - camera.y) * 0.1;
+        }
+        
+        // Update game
+        function update() {
+            if (!gameRunning) return;
+            
+            updatePlayer();
+            
+            // Update bullets
+            bullets = bullets.filter(b => {
+                b.update();
+                return b.life > 0;
+            });
+            
+            // Bullet collisions
+            bullets.forEach((b, bi) => {
+                if (b.isPlayer) {
+                    enemies.forEach((e, ei) => {
+                        const dx = b.x - e.x;
+                        const dy = b.y - e.y;
+                        if (Math.sqrt(dx*dx + dy*dy) < 25) {
+                            e.health--;
+                            b.life = 0;
+                            // Hit effect
+                            for (let i = 0; i < 8; i++) {
+                                particles.push(new Particle(e.x, e.y, '#ff6600', 8, 15));
+                            }
+                            if (e.health <= 0) {
+                                enemies.splice(ei, 1);
+                                score += 100;
+                                // Death explosion
+                                for (let i = 0; i < 15; i++) {
+                                    particles.push(new Particle(e.x, e.y, '#ff0000', 10, 30));
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // Enemy bullet hitting player
+                    const dx = b.x - player.x;
+                    const dy = b.y - player.y;
+                    if (Math.sqrt(dx*dx + dy*dy) < 25 && player.invincible <= 0 && !player.dodging) {
+                        player.health -= 10;
+                        player.invincible = 60;
+                        b.life = 0;
+                        // Screen shake effect
+                        camera.x += (Math.random() - 0.5) * 20;
+                        camera.y += (Math.random() - 0.5) * 20;
+                    }
+                }
+            });
+            
+            // Update enemies
+            enemies.forEach(e => {
+                e.update();
+                // Player collision with enemy
+                const dx = player.x - e.x;
+                const dy = player.y - e.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 35 && player.invincible <= 0 && !player.dodging) {
+                    player.health -= 20;
+                    player.invincible = 60;
+                    player.vx = dx > 0 ? 10 : -10;
+                    player.vy = -5;
+                }
+            });
+            
+            // Update coins
+            coins.forEach(c => {
+                c.update();
+                const dx = player.x - c.x;
+                const dy = player.y - c.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 30 && !c.collected) {
+                    c.collected = true;
+                    score += 50;
+                    // Collect effect
+                    for (let i = 0; i < 10; i++) {
+                        particles.push(new Particle(c.x, c.y, '#ffd700', 6, 20));
+                    }
+                }
+            });
+            coins = coins.filter(c => !c.collected);
+            
+            // Update particles
+            particles = particles.filter(p => {
+                p.update();
+                return p.life > 0;
+            });
+            
+            // Update UI
+            document.getElementById('score').textContent = score;
+            document.getElementById('healthFill').style.width = Math.max(0, player.health) + '%';
+            
+            // Check game over
+            if (player.health <= 0) {
+                gameOver();
+            }
+        }
+        
+        // Draw game
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Background grid
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            const gridSize = 50;
+            const offsetX = -camera.x % gridSize;
+            const offsetY = -camera.y % gridSize;
+            for (let x = offsetX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = offsetY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Draw platforms
+            platforms.forEach(p => {
+                const sx = p.x - camera.x;
+                const sy = p.y - camera.y;
+                if (sx + p.width < 0 || sx > canvas.width) return;
+                
+                // Platform glow
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#0ff';
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+                ctx.fillRect(sx, sy, p.width, p.height);
+                ctx.fillStyle = '#0ff';
+                ctx.fillRect(sx, sy, p.width, 3);
+                ctx.shadowBlur = 0;
+            });
+            
+            // Draw coins
+            coins.forEach(c => c.draw());
+            
+            // Draw enemies
+            enemies.forEach(e => e.draw());
+            
+            // Draw bullets
+            bullets.forEach(b => b.draw());
+            
+            // Draw player
+            const px = player.x - camera.x;
+            const py = player.y - camera.y;
+            
+            ctx.save();
+            ctx.translate(px, py);
+            
+            // Dodge effect
+            if (player.dodging) {
+                ctx.globalAlpha = 0.5;
+                ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+            }
+            
+            // Invincibility flash
+            if (player.invincible > 0 && Math.floor(Date.now() / 50) % 2 === 0) {
+                ctx.globalAlpha = 0.5;
+            }
+            
+            // Player body
+            ctx.fillStyle = player.color;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = player.color;
+            ctx.fillRect(-15, -20, 30, 40);
+            
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(player.facing > 0 ? 5 : -10, -15, 8, 8);
+            
+            // Weapon
+            if (!player.dodging) {
+                ctx.fillStyle = '#ff0066';
+                ctx.fillRect(player.facing > 0 ? 10 : -20, -5, 15, 6);
+            }
+            
+            ctx.restore();
+            
+            // Draw particles
+            particles.forEach(p => p.draw());
+        }
+        
+        // Game loop
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+        
+        // Start game
+        function startGame() {
+            document.getElementById('startScreen').classList.add('hidden');
+            gameRunning = true;
+            player.health = 100;
+            player.x = 100;
+            player.y = 300;
+            score = 0;
+            generateLevel();
+        }
+        
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('endTitle').textContent = player.health <= 0 ? '☠️ GAME OVER' : '🎉 VICTORY!';
+        }
+        
+        // Restart
+        function restartGame() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            startGame();
+        }
+        
+        // Start loop
+        loop();
+    </script>
+</body>
+</html>
